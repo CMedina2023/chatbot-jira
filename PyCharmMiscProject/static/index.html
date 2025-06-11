@@ -1,33 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Soporte Jira</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Soporte Jira AI</title>
+    <!-- Tailwind CSS CDN para un estilo rápido y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter para una tipografía moderna -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilo base para el cuerpo, usando la fuente Inter y un degradado sutil */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #6a11cb 0%, #2575fc 100%); /* Degradado de azul a morado */
+        }
+        /* Oculta la barra de desplazamiento pero permite el scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
 </head>
-<body style="font-family:sans-serif; padding: 20px;">
-    <h1>Asistente de Soporte Jira</h1>
-    <form id="formulario">
-        <textarea id="pregunta" placeholder="Escribe tu consulta sobre Jira..." rows="5" cols="50" required></textarea><br><br>
-        <button type="submit">Enviar</button>
-    </form>
-    <h2>Respuesta:</h2>
-    <div id="respuesta" style="white-space: pre-wrap; border: 1px solid #ccc; padding: 10px;"></div>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <!-- Contenedor principal del chatbot con estilos de tarjeta -->
+    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full flex flex-col space-y-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">Asistente de Soporte Jira AI</h1>
+        <p class="text-center text-gray-600 mb-6">¡Hola! Estoy aquí para ayudarte con tus consultas sobre Jira. Pregúntame lo que necesites.</p>
+
+        <!-- Área del historial de chat -->
+        <div id="chat-history" class="flex flex-col space-y-4 overflow-y-auto max-h-96 p-4 bg-gray-50 rounded-lg border border-gray-200 no-scrollbar">
+            <!-- Mensaje de bienvenida inicial del bot -->
+            <div class="flex justify-start">
+                <div class="bg-blue-100 text-blue-800 p-3 rounded-lg max-w-[80%] shadow">
+                    Bienvenido. ¿En qué puedo ayudarte hoy?
+                </div>
+            </div>
+            <!-- Los mensajes se añadirán aquí dinámicamente -->
+        </div>
+
+        <!-- Formulario de entrada de texto -->
+        <form id="chatbot-form" class="flex flex-col space-y-4">
+            <textarea
+                id="pregunta"
+                placeholder="Escribe tu consulta sobre Jira aquí..."
+                rows="4"
+                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out resize-none"
+                required
+            ></textarea>
+            <button
+                type="submit"
+                id="send-button"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                Enviar
+            </button>
+        </form>
+
+        <!-- Indicador de carga -->
+        <div id="loading-indicator" class="hidden text-center text-blue-600 font-medium">
+            Pensando... <span class="animate-pulse">_</span>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div id="error-message" class="hidden text-center text-red-600 font-medium p-2 rounded-lg bg-red-50">
+            Ocurrió un error. Por favor, inténtalo de nuevo.
+        </div>
+    </div>
 
     <script>
-        document.getElementById("formulario").addEventListener("submit", async function(e) {
-            e.preventDefault();
-            const pregunta = document.getElementById("pregunta").value;
-            const formData = new FormData();
-            formData.append("pregunta", pregunta);
+        // Obtiene referencias a los elementos del DOM
+        const chatForm = document.getElementById("chatbot-form");
+        const preguntaInput = document.getElementById("pregunta");
+        const chatHistoryDiv = document.getElementById("chat-history");
+        const sendButton = document.getElementById("send-button");
+        const loadingIndicator = document.getElementById("loading-indicator");
+        const errorMessageDiv = document.getElementById("error-message");
 
-            const response = await fetch("/api/consultar", {
-                method: "POST",
-                body: formData
-            });
+        // Define la URL de tu API de FastAPI (relativa, ya que está en el mismo dominio)
+        const apiUrl = "/api/consultar";
 
-            const data = await response.json();
-            document.getElementById("respuesta").textContent = data.respuesta;
+        /**
+         * Añade un mensaje al historial del chat.
+         * @param {string} sender - El remitente del mensaje ('user' o 'bot').
+         * @param {string} text - El texto del mensaje.
+         */
+        function addMessage(sender, text) {
+            const messageDiv = document.createElement("div");
+            // Ajusta la alineación del mensaje según el remitente
+            messageDiv.classList.add("flex", sender === "user" ? "justify-end" : "justify-start");
+
+            const bubbleDiv = document.createElement("div");
+            // Define los estilos de la burbuja del mensaje
+            bubbleDiv.classList.add(
+                "p-3",
+                "rounded-lg",
+                "max-w-[80%]", // Ancho máximo de la burbuja
+                "shadow",
+                sender === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800" // Colores según el remitente
+            );
+            // Usa textContent para seguridad y para mostrar los saltos de línea correctamente
+            bubbleDiv.textContent = text; 
+
+            messageDiv.appendChild(bubbleDiv);
+            chatHistoryDiv.appendChild(messageDiv);
+
+            // Desplazar automáticamente al final del historial de chat para ver el último mensaje
+            chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+        }
+
+        // Manejador del evento de envío del formulario
+        chatForm.addEventListener("submit", async function(e) {
+            e.preventDefault(); // Previene el envío del formulario por defecto (recarga de página)
+
+            const pregunta = preguntaInput.value.trim(); // Obtiene la pregunta del usuario y elimina espacios en blanco
+            if (!pregunta) {
+                return; // Si la pregunta está vacía, no hace nada
+            }
+
+            // 1. Muestra la pregunta del usuario en el historial
+            addMessage("user", pregunta);
+
+            // 2. Limpia el campo de entrada
+            preguntaInput.value = "";
+
+            // 3. Muestra el indicador de carga y deshabilita el botón de enviar
+            loadingIndicator.classList.remove("hidden");
+            sendButton.disabled = true;
+            errorMessageDiv.classList.add("hidden"); // Oculta cualquier mensaje de error previo
+
+            try {
+                // 4. Prepara los datos del formulario para enviar al backend
+                const formData = new FormData();
+                formData.append("pregunta", pregunta);
+
+                // 5. Realiza la solicitud POST a la API de FastAPI
+                const response = await fetch(apiUrl, {
+                    method: "POST",
+                    body: formData
+                });
+
+                // 6. Verifica si la respuesta HTTP fue exitosa (código 2xx)
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+
+                // 7. Parsea la respuesta JSON del backend
+                const data = await response.json();
+                
+                // 8. Muestra la respuesta del asistente en el historial
+                addMessage("bot", data.respuesta);
+
+            } catch (error) {
+                // 9. Manejo de errores en caso de fallo de la solicitud
+                console.error("Error al consultar al chatbot:", error);
+                errorMessageDiv.textContent = `Ocurrió un error: ${error.message}. Por favor, inténtalo de nuevo.`;
+                errorMessageDiv.classList.remove("hidden"); // Muestra el mensaje de error al usuario
+                // Opcional: añadir un mensaje de error genérico al chat
+                addMessage("bot", "Lo siento, no pude procesar tu solicitud en este momento. Por favor, inténtalo de nuevo más tarde.");
+            } finally {
+                // 10. Oculta el indicador de carga y habilita el botón de enviar, sin importar el resultado
+                loadingIndicator.classList.add("hidden");
+                sendButton.disabled = false;
+            }
         });
     </script>
 </body>
 </html>
-
