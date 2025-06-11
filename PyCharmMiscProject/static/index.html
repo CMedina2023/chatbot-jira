@@ -64,9 +64,9 @@
             Pensando... <span class="animate-pulse">_</span>
         </div>
 
-        <!-- Mensaje de error -->
-        <div id="error-message" class="hidden text-center text-red-600 font-medium p-2 rounded-lg bg-red-50">
-            Ocurrió un error. Por favor, inténtalo de nuevo.
+        <!-- Mensaje de error (ahora con más estilo para visibilidad) -->
+        <div id="error-message" class="hidden text-center p-3 rounded-lg bg-red-100 text-red-800 font-semibold border border-red-300">
+            <!-- El mensaje de error se insertará aquí dinámicamente -->
         </div>
     </div>
 
@@ -79,8 +79,10 @@
         const loadingIndicator = document.getElementById("loading-indicator");
         const errorMessageDiv = document.getElementById("error-message");
 
-        // Define la URL de tu API de FastAPI (relativa, ya que está en el mismo dominio)
-        const apiUrl = "/api/consultar";
+        // Define la URL de tu API de FastAPI de forma absoluta, usando el origen actual
+        // Esto ayuda a evitar problemas si el front-end y el back-end están en rutas ligeramente diferentes.
+        const apiUrl = window.location.origin + "/api/consultar"; 
+        console.log("API URL configured:", apiUrl); // Log para depuración
 
         /**
          * Añade un mensaje al historial del chat.
@@ -88,6 +90,7 @@
          * @param {string} text - El texto del mensaje.
          */
         function addMessage(sender, text) {
+            console.log(`Adding message from ${sender}: ${text}`); // Log para depuración
             const messageDiv = document.createElement("div");
             // Ajusta la alineación del mensaje según el remitente
             messageDiv.classList.add("flex", sender === "user" ? "justify-end" : "justify-start");
@@ -114,9 +117,11 @@
         // Manejador del evento de envío del formulario
         chatForm.addEventListener("submit", async function(e) {
             e.preventDefault(); // Previene el envío del formulario por defecto (recarga de página)
+            console.log("Formulario enviado."); // Log para depuración
 
             const pregunta = preguntaInput.value.trim(); // Obtiene la pregunta del usuario y elimina espacios en blanco
             if (!pregunta) {
+                console.log("Pregunta vacía, no se envía."); // Log para depuración
                 return; // Si la pregunta está vacía, no hace nada
             }
 
@@ -135,27 +140,37 @@
                 // 4. Prepara los datos del formulario para enviar al backend
                 const formData = new FormData();
                 formData.append("pregunta", pregunta);
+                console.log("Enviando consulta a la API..."); // Log para depuración
 
                 // 5. Realiza la solicitud POST a la API de FastAPI
                 const response = await fetch(apiUrl, {
                     method: "POST",
                     body: formData
                 });
+                console.log("Respuesta de la API recibida."); // Log para depuración
 
                 // 6. Verifica si la respuesta HTTP fue exitosa (código 2xx)
                 if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
+                    const errorText = await response.text(); // Intenta leer el texto del error
+                    console.error("Error en la respuesta HTTP:", response.status, errorText); // Log para depuración de error HTTP
+                    throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
                 }
 
                 // 7. Parsea la respuesta JSON del backend
                 const data = await response.json();
-                
+                console.log('API Response data:', data); // Log para depuración
+
                 // 8. Muestra la respuesta del asistente en el historial
-                addMessage("bot", data.respuesta);
+                if (data.respuesta) {
+                    addMessage("bot", data.respuesta);
+                } else {
+                    addMessage("bot", "La API devolvió una respuesta inesperada o vacía.");
+                    console.error("API response missing 'respuesta' field:", data);
+                }
 
             } catch (error) {
                 // 9. Manejo de errores en caso de fallo de la solicitud
-                console.error("Error al consultar al chatbot:", error);
+                console.error("Error al consultar al chatbot (en el catch):", error); // Log para depuración de error en catch
                 errorMessageDiv.textContent = `Ocurrió un error: ${error.message}. Por favor, inténtalo de nuevo.`;
                 errorMessageDiv.classList.remove("hidden"); // Muestra el mensaje de error al usuario
                 // Opcional: añadir un mensaje de error genérico al chat
