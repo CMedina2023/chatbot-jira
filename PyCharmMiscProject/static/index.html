@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Soporte Jira</title>
+</head>
+<body style="font-family:sans-serif; padding: 20px;">
+    <h1>Asistente de Soporte Jira</h1>
+    <form id="formulario">
+        <textarea id="pregunta" placeholder="Escribe tu consulta sobre Jira..." rows="5" cols="50" required></textarea><br><br>
+        <button type="submit">Enviar</button>
+    </form>
+    <h2>Respuesta:</h2>
+    <div id="respuesta" style="white-space: pre-wrap; border: 1px solid #ccc; padding: 10px;"></div>
+
+    <script>
+        document.getElementById("formulario").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const pregunta = document.getElementById("pregunta").value;
+            const formData = new FormData();
+            formData.append("pregunta", pregunta);
+
+            const response = await fetch("/api/consultar", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            document.getElementById("respuesta").textContent = data.respuesta;
+        });
+    </script>
+</body>
+</html>
+
