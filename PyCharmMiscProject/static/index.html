@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente de Soporte Jira AI</title>
-    <!-- Tailwind CSS CDN for quick and responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts - Inter for modern typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- showdown.js for Markdown to HTML conversion -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
     <style>
         /* Base styles for the body, using Inter font and a subtle gradient */
@@ -52,28 +49,26 @@
             border-radius: 10px;
             border: 2px solid #f3f4f6;
         }
+        /* No specific styles needed for suggested-question-item anymore as it's a select option */
+        /* The select element will be styled directly with Tailwind classes */
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
-    <!-- Main chatbot container with card-like styles -->
-    <!-- Increased max-w-xl for a wider chatbot and adjusted padding -->
-    <div class="bg-white rounded-xl shadow-2xl p-10 max-w-xl w-full flex flex-col space-y-6">
+    <div class="bg-white rounded-xl shadow-2xl p-10 max-w-3xl w-full flex flex-col space-y-6">
         <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">Asistente de Soporte Jira AI</h1>
         <p class="text-center text-gray-600 mb-6">¡Hola! Estoy aquí para ayudarte con tus consultas sobre Jira. Pregúntame lo que necesites.</p>
 
-        <!-- Chat history area -->
-        <!-- Adjusted max-h-96 for more visible height -->
-        <div id="chat-history" class="flex flex-col space-y-4 overflow-y-auto max-h-[400px] p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <!-- Initial welcome message from the bot -->
-            <div class="flex justify-start">
-                <div class="bg-blue-100 text-blue-800 p-3 rounded-lg max-w-[80%] shadow chat-bubble-text">
-                    Bienvenido. ¿En qué puedo ayudarte hoy?
-                </div>
+        <div id="chat-history" class="flex-grow overflow-y-auto p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4 h-96">
             </div>
-            <!-- Messages will be added here dynamically -->
+
+        <div id="suggested-questions-container" class="mb-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3">¿Quizás quieres preguntar sobre esto?</h2>
+            <select id="suggested-questions-select"
+                    class="block w-full p-3 border border-blue-300 rounded-lg bg-blue-50 text-blue-800 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer">
+                <option value="" disabled selected>Selecciona una pregunta sugerida</option>
+                </select>
         </div>
 
-        <!-- Text input form -->
         <form id="chatbot-form" class="flex flex-col space-y-4">
             <textarea
                 id="pregunta"
@@ -91,15 +86,12 @@
             </button>
         </form>
 
-        <!-- Loading indicator -->
         <div id="loading-indicator" class="hidden text-center text-blue-600 font-medium">
             Pensando... <span class="animate-pulse">_</span>
         </div>
 
-        <!-- Error message (now with more styling for visibility) -->
         <div id="error-message" class="hidden text-center p-3 rounded-lg bg-red-100 text-red-800 font-semibold border border-red-300">
-            <!-- Error message will be inserted here dynamically -->
-        </div>
+            </div>
     </div>
 
     <script>
@@ -110,13 +102,74 @@
         const sendButton = document.getElementById("send-button");
         const loadingIndicator = document.getElementById("loading-indicator");
         const errorMessageDiv = document.getElementById("error-message");
+        const suggestedQuestionsContainer = document.getElementById("suggested-questions-container");
+        const suggestedQuestionsSelect = document.getElementById("suggested-questions-select"); // Referencia al select
 
         // Initialize showdown.js converter
         const converter = new showdown.Converter();
 
         // Define the API URL for your FastAPI backend (relative, as it's on the same domain)
         const apiUrl = window.location.origin + "/api/consultar";
-        console.log("API URL configured:", apiUrl); // Debugging log
+        console.log("API URL configured:", apiUrl);
+
+        // Conjunto de preguntas sugeridas
+        const allSuggestedQuestions = [
+            "¿Cómo creo una tarea en Jira?",
+            "¿Qué es un sprint en Scrum y cómo se gestiona?",
+            "¿Cómo actualizo el estado de un ticket y notifico a otros?",
+            "Diferencia entre Epic, Story y Task en Jira.",
+            "¿Cómo genero un informe de progreso de un proyecto?",
+            "¿Qué son los flujos de trabajo en Jira?",
+            "¿Cómo puedo configurar un nuevo tablero Kanban?",
+            "¿Cuál es la diferencia entre Jira Software y Jira Service Management?",
+            "¿Cómo se vinculan incidencias en Jira?",
+            "¿Cómo puedo buscar tickets específicos en Jira usando JQL?",
+            "¿Cómo agrego un comentario a un ticket de Jira?",
+            "¿Qué es un componente en Jira y para qué sirve?",
+            "¿Cómo se utiliza el backlog en un proyecto Scrum?",
+            "¿Qué es la definición de 'Done' en un equipo Scrum?",
+            "¿Cómo asigno un ticket a un miembro del equipo?",
+            "¿Cuáles son los roles clave en un equipo Scrum con Jira?"
+        ];
+
+        let questionsShownHistory = new Set(); // Para evitar repeticiones recientes
+        const maxSuggestions = 5; // Número de preguntas a mostrar en el desplegable (un poco más para tener variedad)
+
+        /**
+         * Genera y muestra un nuevo conjunto de preguntas sugeridas en el select.
+         */
+        function updateSuggestedQuestions() {
+            // Limpiar opciones anteriores, excepto la opción por defecto
+            suggestedQuestionsSelect.innerHTML = '<option value="" disabled selected>Selecciona una pregunta sugerida</option>';
+            suggestedQuestionsContainer.classList.remove("hidden"); // Asegurarse de que el contenedor sea visible
+
+            let availableQuestions = allSuggestedQuestions.filter(q => !questionsShownHistory.has(q));
+
+            if (availableQuestions.length < maxSuggestions) {
+                // Si no quedan suficientes preguntas nuevas, resetea el historial y vuelve a usar todas
+                questionsShownHistory.clear();
+                availableQuestions = [...allSuggestedQuestions];
+            }
+
+            // Shuffle availableQuestions para que el orden sea aleatorio cada vez
+            for (let i = availableQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableQuestions[i], availableQuestions[j]] = [availableQuestions[j], availableQuestions[i]];
+            }
+
+            // Añadir las nuevas opciones al select
+            for (let i = 0; i < maxSuggestions; i++) {
+                if (availableQuestions.length === 0) break;
+
+                const question = availableQuestions.shift(); // Toma la primera pregunta y la elimina del array
+
+                const option = document.createElement("option");
+                option.value = question;
+                option.textContent = question;
+                suggestedQuestionsSelect.appendChild(option);
+                questionsShownHistory.add(question); // Añadir al historial de mostradas
+            }
+        }
 
         /**
          * Adds a message to the chat history.
@@ -125,107 +178,94 @@
          * @param {boolean} isMarkdown - True if the text should be parsed as Markdown.
          */
         function addMessage(sender, text, isMarkdown = false) {
-            console.log(`Adding message from ${sender}: ${text}`); // Debugging log
             const messageDiv = document.createElement("div");
-            // Adjust message alignment based on sender
-            messageDiv.classList.add("flex", sender === "user" ? "justify-end" : "justify-start");
+            messageDiv.classList.add("flex", sender === "user" ? "justify-end" : "justify-start", "mb-3");
 
             const bubbleDiv = document.createElement("div");
-            // Define basic styles that always apply
             bubbleDiv.classList.add("p-3", "rounded-lg", "max-w-[80%]", "shadow", "chat-bubble-text");
 
-            // Apply specific colors based on sender
             if (sender === "user") {
                 bubbleDiv.classList.add("bg-blue-600", "text-white");
             } else {
                 bubbleDiv.classList.add("bg-gray-100", "text-gray-800");
             }
 
-            // Set content, convert Markdown if specified
             if (isMarkdown) {
-                bubbleDiv.innerHTML = converter.makeHtml(text); // Use innerHTML for Markdown
+                bubbleDiv.innerHTML = converter.makeHtml(text);
             } else {
-                bubbleDiv.textContent = text; // Use textContent for plain text
+                bubbleDiv.textContent = text;
             }
 
             messageDiv.appendChild(bubbleDiv);
             chatHistoryDiv.appendChild(messageDiv);
-
-            // Automatically scroll to the bottom of the chat history
             chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
         }
 
         // Event handler for form submission
         chatForm.addEventListener("submit", async function(e) {
-            e.preventDefault(); // Prevent default form submission (page reload)
-            console.log("Form submitted."); // Debugging log
+            e.preventDefault();
 
-            const pregunta = preguntaInput.value.trim(); // Get user's question and remove whitespace
+            const pregunta = preguntaInput.value.trim();
             if (!pregunta) {
-                console.log("Empty question, not sending."); // Debugging log
-                return; // If question is empty, do nothing
+                return;
             }
 
-            // 1. Display user's question in chat history (as plain text)
             addMessage("user", pregunta);
+            preguntaInput.value = ""; // Limpiar el textarea
+            suggestedQuestionsSelect.value = ""; // Resetear el select a la opción por defecto
 
-            // 2. Clear input field
-            preguntaInput.value = "";
+            // Ocultar las preguntas sugeridas mientras se procesa la respuesta
+            suggestedQuestionsContainer.classList.add("hidden");
 
-            // 3. Show loading indicator and disable send button
             loadingIndicator.classList.remove("hidden");
             sendButton.disabled = true;
-            errorMessageDiv.classList.add("hidden"); // Hide any previous error message
+            errorMessageDiv.classList.add("hidden");
 
             try {
-                // 4. Prepare form data to send to backend
                 const formData = new FormData();
                 formData.append("pregunta", pregunta);
-                console.log("Sending query to API..."); // Debugging log
 
-                // 5. Make POST request to FastAPI API
                 const response = await fetch(apiUrl, {
                     method: "POST",
                     body: formData
                 });
-                console.log("API response received."); // Debugging log
 
-                // 6. Check if HTTP response was successful (2xx status code)
                 if (!response.ok) {
-                    const errorText = await response.text(); // Attempt to read error text
-                    console.error("HTTP response error:", response.status, errorText); // Debugging log for HTTP error
+                    const errorText = await response.text();
                     throw new Error(`HTTP Error: ${response.status} - ${errorText}`);
                 }
 
-                // 7. Parse JSON response from backend
                 const data = await response.json();
-                console.log('API Response data:', data); // Debugging log
 
-                // 8. Display assistant's response in chat history (as Markdown)
                 if (data.respuesta) {
-                    addMessage("bot", data.respuesta, true); // Pass true for isMarkdown
+                    addMessage("bot", data.respuesta, true);
                 } else {
                     addMessage("bot", "La API devolvió una respuesta inesperada o vacía.");
-                    console.error("API response missing 'respuesta' field:", data);
                 }
 
             } catch (error) {
-                // 9. Error handling for failed request
-                console.error("Error consulting chatbot (in catch block):", error); // Debugging log for error in catch
+                console.error("Error consulting chatbot:", error);
                 errorMessageDiv.textContent = `Ocurrió un error: ${error.message}. Por favor, inténtalo de nuevo.`;
-                errorMessageDiv.classList.remove("hidden"); // Show error message to user
-                // Optional: add a generic error message to chat
+                errorMessageDiv.classList.remove("hidden");
                 addMessage("bot", "Lo siento, no pude procesar tu solicitud en este momento. Por favor, inténtalo de nuevo más tarde.");
             } finally {
-                // 10. Hide loading indicator and enable send button, regardless of result
                 loadingIndicator.classList.add("hidden");
                 sendButton.disabled = false;
+                updateSuggestedQuestions(); // Actualizar las preguntas sugeridas después de la respuesta
             }
         });
-        // Ensure the initial welcome message is also rendered with Markdown if it contains any
-        // Note: The welcome message is currently plain text, but this sets up for future.
-        // The current welcome message in HTML is directly in the div, so no need to re-add.
-        // addMessage("bot", "Bienvenido. ¿En qué puedo ayudarte hoy?", false);
+
+        // Event listener para la selección de preguntas sugeridas en el desplegable
+        suggestedQuestionsSelect.addEventListener("change", function(e) {
+            const selectedQuestion = e.target.value;
+            if (selectedQuestion) { // Asegurarse de que no sea la opción "Selecciona una pregunta sugerida"
+                preguntaInput.value = selectedQuestion;
+                chatForm.dispatchEvent(new Event("submit")); // Enviar el formulario
+            }
+        });
+
+        // Cargar las preguntas sugeridas al inicio
+        updateSuggestedQuestions();
     </script>
 </body>
 </html>
