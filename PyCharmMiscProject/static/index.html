@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistente de Soporte Jira AI</title>
+    <title>LiverBot - Asistente de El Puerto de Liverpool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        /* Definir variables CSS para los colores institucionales de Liverpool */
+        :root {
+            --liverpool-purple: #6A1A5B; /* Un morado similar al de la imagen */
+            --liverpool-light-bg: #F5F5F5; /* Un gris muy claro, casi blanco, para contrastar */
+            --liverpool-text-light: #FFFFFF; /* Texto blanco para fondos oscuros */
+            --liverpool-text-dark: #333333; /* Texto oscuro para fondos claros */
+        }
+
         /* Base styles for the body, using Inter font and a subtle gradient */
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(to right, #6a11cb 0%, #2575fc 100%); /* Blue to purple gradient */
+            /* Degradado con el morado principal y un tono más claro del mismo morado o el gris claro */
+            background: linear-gradient(to right, var(--liverpool-purple) 0%, #8E2B7A 100%); /* Morado principal a un tono más claro/magenta */
         }
         /* Styles for text in chat bubbles for better readability */
         .chat-bubble-text {
@@ -35,28 +45,35 @@
         /* Ensure the scrollbar is visible for chat history */
         #chat-history {
             scrollbar-width: thin; /* For Firefox */
-            scrollbar-color: #9ca3af #f3f4f6; /* Thumb and track color */
+            scrollbar-color: #A3A3A3 var(--liverpool-light-bg); /* Thumb y track color ajustados */
         }
         #chat-history::-webkit-scrollbar {
             width: 8px; /* Width for Webkit browsers */
         }
         #chat-history::-webkit-scrollbar-track {
-            background: #f3f4f6; /* Track color */
+            background: var(--liverpool-light-bg); /* Track color */
             border-radius: 10px;
         }
         #chat-history::-webkit-scrollbar-thumb {
-            background-color: #9ca3af; /* Thumb color */
+            background-color: #A3A3A3; /* Thumb color ajustado */
             border-radius: 10px;
-            border: 2px solid #f3f4f6;
+            border: 2px solid var(--liverpool-light-bg);
         }
-        /* No specific styles needed for suggested-question-item anymore as it's a select option */
-        /* The select element will be styled directly with Tailwind classes */
+        /* Estilo para alinear el icono y el texto del título */
+        .header-title-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px; /* Espacio entre el icono y el texto */
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
     <div class="bg-white rounded-xl shadow-2xl p-10 max-w-3xl w-full flex flex-col space-y-6">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">Asistente de Soporte Jira AI</h1>
-        <p class="text-center text-gray-600 mb-6">¡Hola! Estoy aquí para ayudarte con tus consultas sobre Jira. Pregúntame lo que necesites.</p>
+        <div class="header-title-container">
+            <i class="fas fa-robot text-4xl text-gray-800"></i> <h1 class="text-3xl font-bold text-gray-800">LiverBot</h1>
+        </div>
+        <p class="text-center text-gray-600 text-sm mb-4">Asistente de Soporte para El Puerto de Liverpool</p>
 
         <div id="chat-history" class="flex-grow overflow-y-auto p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4 h-96">
             </div>
@@ -64,7 +81,7 @@
         <div id="suggested-questions-container" class="mb-6 hidden">
             <h2 class="text-lg font-semibold text-gray-700 mb-3">¿Quizás quieres preguntar sobre esto?</h2>
             <select id="suggested-questions-select"
-                    class="block w-full p-3 border border-blue-300 rounded-lg bg-blue-50 text-blue-800 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer">
+                    class="block w-full p-3 border border-purple-300 rounded-lg bg-purple-50 text-purple-800 focus:ring-purple-500 focus:border-purple-500 appearance-none cursor-pointer">
                 <option value="" disabled selected>Selecciona una pregunta sugerida</option>
                 </select>
         </div>
@@ -72,25 +89,25 @@
         <form id="chatbot-form" class="flex flex-col space-y-4">
             <textarea
                 id="pregunta"
-                placeholder="Escribe tu consulta sobre Jira aquí..."
+                placeholder="Escribe tu consulta aquí..."
                 rows="4"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out resize-none"
+                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-purple-600 focus:border-purple-600 transition duration-200 ease-in-out resize-none"
                 required
             ></textarea>
             <button
                 type="submit"
                 id="send-button"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full bg-purple-700 hover:bg-purple-800 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Enviar
             </button>
         </form>
 
-        <div id="loading-indicator" class="hidden text-center text-blue-600 font-medium">
+        <div id="loading-indicator" class="hidden text-center text-purple-700 font-medium">
             Pensando... <span class="animate-pulse">_</span>
         </div>
 
-        <div id="error-message" class="hidden text-center p-3 rounded-lg bg-red-100 text-red-800 font-semibold border border-red-300">
+        <div id="error-message" class="hidden text-center p-3 rounded-lg bg-purple-100 text-purple-800 font-semibold border border-purple-300">
             </div>
     </div>
 
@@ -184,8 +201,10 @@
             bubbleDiv.classList.add("p-3", "rounded-lg", "max-w-[80%]", "shadow", "chat-bubble-text");
 
             if (sender === "user") {
-                bubbleDiv.classList.add("bg-blue-600", "text-white");
+                // Burbuja del usuario con el morado de Liverpool
+                bubbleDiv.classList.add("bg-purple-700", "text-white"); /* Usamos purple-700 para un morado oscuro */
             } else {
+                // Burbuja del bot con color gris muy claro
                 bubbleDiv.classList.add("bg-gray-100", "text-gray-800");
             }
 
